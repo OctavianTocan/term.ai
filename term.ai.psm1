@@ -1,0 +1,117 @@
+# Folder: $HOME\Documents\PowerShell\Modules\term.ai
+# File:   term.ai.psm1
+
+# --- Configuration ---
+$script:TermAI_Model = "granite4:tiny-h"
+$script:TermAI_KeepAliveSec = 45
+$script:TermAI_UnloadTimer = $null
+
+function Start-PowershellModelUnloadTimer {
+    # Create a timer (if not already created)
+    if (-not $script:TermAI_UnloadTimer) {
+        $script:TermAI_UnloadTimer = New-Object System.Timers.Timer
+        $script:TermAI_UnloadTimer.AutoReset = $false
+        $script:TermAI_UnloadTimer.add_Elapsed({
+                try {
+                    & ollama stop $script:TermAI_Model | Out-Null
+                }
+                catch {}
+            })
+    }
+}
+
+function Restart-PowershellModelUnloadTimer {
+    if ($script:TermAI_UnloadTimer) {
+        $script:TermAI_UnloadTimer.Interval = [double]($script:TermAI_KeepAliveSec * 1000)
+        $script:TermAI_UnloadTimer.Stop()
+        $script:TermAI_UnloadTimer.Start()
+    }
+}
+
+# Start the feature. Binds Enter so we can inspect the current line.
+function Start-TermAI {
+    param(
+        [string]$Trigger = '#',          # Lines starting with this mean "ask AI"
+        [switch]$EchoPrompt              # Show the prompt line above the answer
+    )
+
+    # Persist settings for the key handler to read
+    Set-Variable -Name TermAI_Trigger     -Scope Script -Value $Trigger
+    Set-Variable -Name TermAI_EchoPrompt  -Scope Script -Value $EchoPrompt.IsPresent
+
+    # Initialize the timer if needed
+    Start-PowershellModelUnloadTimer
+
+    # Rebind Enter key
+    Set-PSReadLineKeyHandler -Key Enter -BriefDescription 'TermAI intercept' -ScriptBlock {
+        param($key, $arg)
+
+        # Read current input buffer
+        $line = $null; $cursor = 0
+        [Microsoft.PowerShell.PSConsoleReadLine]::GetBufferState([ref]$line, [ref]$cursor)
+
+        $trigger = (Get-Variable -Name TermAI_Trigger -Scope Script -ValueOnly)
+        $echo = (Get-Variable -Name TermAI_EchoPrompt -Scope Script -ValueOnly)
+
+        $escapedTrigger = [regex]::Escape($trigger)
+        if ($line -match "^\s*$escapedTrigger\s*(.*)$") {
+            $promptText = $Matches[1]
+
+            # Clear input line so it doesn’t execute
+            [Microsoft.PowerShell.PSConsoleReadLine]::RevertLine()
+
+            if ($echo) {
+                Write-Host ""
+                Write-Host "[you] $promptText"
+            }
+
+            # Invokes the Ollama model reply.
+            Invoke-Ollama -promptText $promptText
+            # Reset idle timer
+            Restart-PowershellModelUnloadTimer
+        }
+
+        [Microsoft.PowerShell.PSConsoleReadLine]::AcceptLine()
+    }
+}
+
+function Invoke-Ollama {
+    param(
+        [string]$promptText
+    )
+
+    $spinner = '|', '/', '-', '\'
+    $model = $script:TermAI_Model
+    $keepAlive = $script:TermAI_KeepAliveSec
+    
+    $job = Start-Job -ScriptBlock {
+        $response = ollama run --keepalive "$($using:keepAlive)s" $using:model $using:promptText `
+        | ForEach-Object { $_.TrimEnd() } | Out-String
+        Write-Host $response.Trim()
+    }
+
+    $i = 0
+    Write-Host "Thinking... " -NoNewline
+    while ($job.State -eq 'Running') {
+        Write-Host "`b$($spinner[$i % 4])" -NoNewline
+        Start-Sleep -Milliseconds 100
+        $i++
+    }
+
+    Write-Host "`b Done!`n"
+    Write-Host "[ai] " -NoNewline
+    Receive-Job $job -Wait -AutoRemoveJob
+}
+
+# Stop the feature. Restores normal Enter behavior and unloads the model.
+function Stop-TermAI {
+    Set-PSReadLineKeyHandler -Key Enter -Function AcceptLine
+    if ($script:TermAI_UnloadTimer) {
+        $script:TermAI_UnloadTimer.Stop()
+        $script:TermAI_UnloadTimer.Dispose()
+        $script:TermAI_UnloadTimer = $null
+    }
+    try { & ollama stop $script:TermAI_Model | Out-Null } catch {}
+}
+
+Export-ModuleMember -Function Start-TermAI, Stop-TermAI
