@@ -108,44 +108,16 @@ function Start-TermAI {
 }
 
 function Invoke-Ollama {
-    param(
-        [string]$promptText
-    )
+    param([string]$promptText)
 
     $model = $script:TermAI_Model
     $assistantName = $script:AssistantName
     $keepAlive = $script:TermAI_KeepAliveSec
-    $spinner = '|', '/', '-', '\'
-    
+
     Write-Host "[$assistantName]: " -NoNewline
 
-    # Show spinner while starting process
-    $job = Start-Job { param($m, $p, $k) & "C:\Users\$env:USERNAME\AppData\Local\Programs\Ollama\ollama.exe" run --keepalive "$($k)s" $m $p } -ArgumentList $model, $promptText, $keepAlive
-    
-    $i = 0
-    Write-Host " " -NoNewline
-    while ($job.State -eq 'Running') {
-        Write-Host "`b$($spinner[$i % 4])" -NoNewline
-        Start-Sleep -Milliseconds 100
-        $i++
-        
-        # Check for early output
-        $output = Receive-Job -Job $job -Keep
-        if ($output) {
-            Write-Host "`b" -NoNewline
-            $output | ForEach-Object {
-                $_.ToCharArray() | ForEach-Object {
-                    Write-Host $_ -NoNewline
-                    Start-Sleep -Milliseconds 10
-                }
-                Write-Host ""
-            }
-            break
-        }
-    }
-
-    # Process remaining output
-    Receive-Job -Job $job -Wait -AutoRemoveJob | ForEach-Object {
+    # Directly stream output from Ollama, assuming it outputs UTF-8
+    & "C:\Users\$env:USERNAME\AppData\Local\Programs\Ollama\ollama.exe" run --keepalive "$($keepAlive)s" $model $promptText | ForEach-Object {
         $line = $_.Trim()
         $line.ToCharArray() | ForEach-Object {
             Write-Host $_ -NoNewline
@@ -154,31 +126,6 @@ function Invoke-Ollama {
         Write-Host ""
     }
 }
-
-
-# function Invoke-Ollama {
-#     param(
-#         [string]$promptText
-#     )
-
-#     $model = $script:TermAI_Model
-#     $assistantName = $script:AssistantName
-#     $keepAlive = $script:TermAI_KeepAliveSec
-
-#     Write-Host "{$assistantName}: " -NoNewline
-
-#     # Run ollama directly and stream output
-#     & "C:\Users\$env:USERNAME\AppData\Local\Programs\Ollama\ollama.exe" run --keepalive "$($keepAlive)s" $model $promptText | ForEach-Object {
-#         # Process each character in the line
-#         $_.ToCharArray() | ForEach-Object {
-#             # Output each character with a small delay
-#             Write-Host $_ -NoNewline
-#             Start-Sleep -Milliseconds 10
-#         }
-#         # Add newline at the end of each line
-#         Write-Host ""
-#     }
-# }
 
 # Stop the feature. Restores normal Enter behavior and unloads the model.
 function Stop-TermAI {
