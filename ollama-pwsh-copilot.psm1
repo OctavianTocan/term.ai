@@ -1,5 +1,5 @@
-# Folder: $HOME\Documents\PowerShell\Modules\term.ai
-# File:   term.ai.psm1
+# Folder: $HOME\Documents\PowerShell\Modules\ollama-pwsh-copilot
+# File:   ollama-pwsh-copilot.psm1
 
 # Examples of LLMs that work well with this:
 #  - granite4:micro

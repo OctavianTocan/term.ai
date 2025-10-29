@@ -1,6 +1,6 @@
 ## Why this project matters
 
-You spend most days inside PowerShell. Generic copilots miss the context. **term.ai** hijacks the Enter key so you can ask a local LLM without breaking flow. It is one of the ten projects I built to show real progress instead of pitching unfinished ideas.
+You spend most days inside PowerShell. Generic copilots miss the context. **ollama-pwsh-copilot** hijacks the Enter key so you can ask a local LLM without breaking flow. It is one of the ten projects I built to show real progress instead of pitching unfinished ideas.
 
 ## What you get
 
@@ -17,10 +17,10 @@ You spend most days inside PowerShell. Generic copilots miss the context. **term
 ## Install it this week
 
 1. Clone the repo.
-2. Copy the folder to `$HOME\Documents\PowerShell\Modules\term.ai`.
-3. Run `Import-Module term.ai` inside PowerShell.
+2. Copy the folder to `$HOME\Documents\PowerShell\Modules\ollama-pwsh-copilot`.
+3. Run `Import-Module ollama-pwsh-copilot` inside PowerShell.
 
-Do this only after you confirm Ollama is installed. The path is hard-coded. If your install lives elsewhere, update `term.ai.psm1` before importing.
+Do this only after you confirm Ollama is installed. The path is hard-coded. If your install lives elsewhere, update the module file before importing.
 
 ## Build the model
 
